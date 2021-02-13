@@ -12,6 +12,7 @@ import time
 
 from anyio import create_task_group
 from async_timeout import timeout
+from dotenv import load_dotenv
 from enum import Enum
 from contextlib import contextmanager
 from more_itertools import first
@@ -19,8 +20,6 @@ from more_itertools import first
 import adapters
 import text_tools
 
-
-TIMEOUT_TIME = 3
 
 logger = logging.getLogger('articles_rate')
 
@@ -136,9 +135,10 @@ async def fetch(session, url):
 
 
 async def process_article(session, morph, charged_words, url):
+    max_waiting_time = int(os.getenv('MAX_WAITING_TIME', default=3))
     with run_timer():
         with handle_exceptions():
-            async with timeout(TIMEOUT_TIME):
+            async with timeout(max_waiting_time):
                 html = await fetch(session, url)
                 sanitize_func = get_sanitize_func(url)
                 article_title, article_text = sanitize_func(html, True)
@@ -171,6 +171,7 @@ async def handle_sessions(urls, session, morph, charged_words, tasks):
 
 
 def test_download_of_articles():
+    load_dotenv()
     logging.basicConfig(level=logging.DEBUG, handlers=[LogHandler()])
     test_mode_var.set(True)
     with pytest.raises(aiohttp.ClientResponseError):
@@ -182,6 +183,7 @@ def test_download_of_articles():
 
 
 def test_parsing_of_articles():
+    load_dotenv()
     logging.basicConfig(level=logging.DEBUG, handlers=[LogHandler()])
     test_mode_var.set(True)
     with pytest.raises(adapters.ArticleNotFound):
@@ -193,9 +195,11 @@ def test_parsing_of_articles():
 
 
 def test_timeouts():
+    load_dotenv()
     logging.basicConfig(level=logging.DEBUG, handlers=[LogHandler()])
     test_mode_var.set(True)
-    test_timeout_var.set(TIMEOUT_TIME + 1)
+    max_waiting_time = int(os.getenv('MAX_WAITING_TIME', default=3))
+    test_timeout_var.set(max_waiting_time + 1)
     with pytest.raises(asyncio.TimeoutError):
         asyncio.run(
             handle_sessions(

@@ -9,3 +9,4 @@ pymorphy2-dicts==2.*
 DAWG-Python==0.7.*
 anyio==2.0.2
 contextvars==2.4
+python-dotenv==0.12.0
