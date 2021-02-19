@@ -7,13 +7,11 @@ from aiohttp import web
 from aiohttp.web_request import Request
 from dotenv import load_dotenv
 from functools import partial
-from contextlib import contextmanager
 
 
 logger = logging.getLogger('articles_rate')
 
 
-@contextmanager
 def get_urls(request, max_articles_count):
     query_params = dict(request.query)
     if not query_params:
@@ -21,7 +19,7 @@ def get_urls(request, max_articles_count):
     urls = query_params['urls'].split(',')
     if len(urls) > max_articles_count:
         raise web.HTTPFound('/400.html/')
-    yield urls
+    return urls
 
 
 async def handle_404_page(request):
@@ -37,10 +35,10 @@ async def handle_400_page(request, max_articles_count):
 
 
 async def handle_index_page(request, max_articles_count):
-    with get_urls(request, max_articles_count) as urls:
-        articles_rates = await urls_handler.handle_sessions(urls)
-        dumps = partial(json.dumps, indent=4, ensure_ascii=False)
-        return web.json_response(articles_rates, content_type='application/json', dumps=dumps)
+    urls = get_urls(request, max_articles_count)
+    articles_rates = await urls_handler.handle_sessions(urls)
+    dumps = partial(json.dumps, indent=4, ensure_ascii=False)
+    return web.json_response(articles_rates, content_type='application/json', dumps=dumps)
 
 
 def main():
