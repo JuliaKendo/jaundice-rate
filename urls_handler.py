@@ -135,7 +135,7 @@ async def process_article(session, morph, charged_words, url, articles_rate):
                 logging.info(article_title)
 
 
-def prepare_clien_session(handle_function):
+def prepare_client_session(handle_function):
     async def inner(urls):
         articles_rate = []
         async with aiohttp.ClientSession() as session:
@@ -147,7 +147,7 @@ def prepare_clien_session(handle_function):
     return inner
 
 
-@prepare_clien_session
+@prepare_client_session
 async def handle_sessions(urls, session, morph, charged_words, tasks, articles_rate):
     for url in urls:
         await tasks.spawn(
