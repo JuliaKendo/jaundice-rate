@@ -33,7 +33,6 @@ class LogHandler(logging.Handler):
     def save_into_context(self, article_rate):
         articles_rate = articles_rate_var.get()
         articles_rate.append(article_rate)
-        articles_rate_var.set(articles_rate)
 
     def article_rate_to_msg(self, article_rate):
         self.save_into_context(article_rate)
