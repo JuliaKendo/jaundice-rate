@@ -36,7 +36,7 @@ async def handle_400_page(request, max_articles_count):
 
 async def handle_index_page(request, max_articles_count):
     urls = get_urls(request, max_articles_count)
-    articles_rates = await urls_handler.handle_sessions(urls)
+    articles_rates = await urls_handler.handle_urls(urls)
     dumps = partial(json.dumps, indent=4, ensure_ascii=False)
     return web.json_response(articles_rates, content_type='application/json', dumps=dumps)
 

@@ -135,20 +135,22 @@ async def process_article(session, morph, charged_words, url, articles_rate):
                 logging.info(article_title)
 
 
-def prepare_client_session(handle_function):
+def prepare_articles_rate(handle_function):
     async def inner(urls):
         articles_rate = []
         async with aiohttp.ClientSession() as session:
             morph = pymorphy2.MorphAnalyzer()
             charged_words = get_charged_words()
             async with create_task_group() as task_group:
-                await handle_function(urls, session, morph, charged_words, task_group, articles_rate)
+                await handle_function(
+                    urls, session, morph, charged_words, task_group, articles_rate
+                )
             return articles_rate
     return inner
 
 
-@prepare_client_session
-async def handle_sessions(urls, session, morph, charged_words, tasks, articles_rate):
+@prepare_articles_rate
+async def handle_urls(urls, session, morph, charged_words, tasks, articles_rate):
     for url in urls:
         await tasks.spawn(
             process_article, session, morph, charged_words, url, articles_rate
@@ -161,7 +163,7 @@ def test_download_of_articles():
     test_mode_var.set(True)
     with pytest.raises(aiohttp.ClientResponseError):
         asyncio.run(
-            handle_sessions(
+            handle_urls(
                 ['https://inosmi.ru/12345/12345.html']
             )
         )
@@ -173,7 +175,7 @@ def test_parsing_of_articles():
     test_mode_var.set(True)
     with pytest.raises(adapters.ArticleNotFound):
         asyncio.run(
-            handle_sessions(
+            handle_urls(
                 ['https://lenta.ru/news/2021/02/13/tesla/']
             )
         )
@@ -187,7 +189,7 @@ def test_timeouts():
     test_timeout_var.set(max_waiting_time + 1)
     with pytest.raises(asyncio.TimeoutError):
         asyncio.run(
-            handle_sessions(
+            handle_urls(
                 ['https://inosmi.ru/economic/20190629/245384784.html']
             )
         )
