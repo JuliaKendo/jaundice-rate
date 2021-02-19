@@ -23,7 +23,6 @@ import text_tools
 
 logger = logging.getLogger('articles_rate')
 
-articles_rate_var = contextvars.ContextVar('articles_rate', default=[])
 test_mode_var = contextvars.ContextVar('test_mode', default=False)
 test_timeout_var = contextvars.ContextVar('test_timeout', default=0)
 
@@ -47,9 +46,8 @@ def run_timer():
 
 
 @contextmanager
-def handle_exceptions():
+def handle_exceptions(articles_rate):
     test_mode = test_mode_var.get()
-    articles_rate = articles_rate_var.get()
     try:
         yield articles_rate
     except aiohttp.ClientResponseError:
@@ -120,10 +118,10 @@ async def fetch(session, url):
         return await response.text()
 
 
-async def process_article(session, morph, charged_words, url):
+async def process_article(session, morph, charged_words, url, articles_rate):
     max_waiting_time = int(os.getenv('MAX_WAITING_TIME', default=3))
     with run_timer():
-        with handle_exceptions() as articles_rate:
+        with handle_exceptions(articles_rate):
             async with timeout(max_waiting_time):
                 html = await fetch(session, url)
                 sanitize_func = get_sanitize_func(url)
@@ -139,21 +137,21 @@ async def process_article(session, morph, charged_words, url):
 
 def prepare_clien_session(handle_function):
     async def inner(urls):
-        articles_rate_var.set([])
+        articles_rate = []
         async with aiohttp.ClientSession() as session:
             morph = pymorphy2.MorphAnalyzer()
             charged_words = get_charged_words()
             async with create_task_group() as task_group:
-                await handle_function(urls, session, morph, charged_words, task_group)
-            return articles_rate_var.get()
+                await handle_function(urls, session, morph, charged_words, task_group, articles_rate)
+            return articles_rate
     return inner
 
 
 @prepare_clien_session
-async def handle_sessions(urls, session, morph, charged_words, tasks):
+async def handle_sessions(urls, session, morph, charged_words, tasks, articles_rate):
     for url in urls:
         await tasks.spawn(
-            process_article, session, morph, charged_words, url
+            process_article, session, morph, charged_words, url, articles_rate
         )
 
 
