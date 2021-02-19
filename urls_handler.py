@@ -30,17 +30,11 @@ test_timeout_var = contextvars.ContextVar('test_timeout', default=0)
 
 class LogHandler(logging.Handler):
 
-    def save_into_context(self, article_rate):
-        articles_rate = articles_rate_var.get()
-        articles_rate.append(article_rate)
-
-    def article_rate_to_msg(self, article_rate):
-        self.save_into_context(article_rate)
-        return f'Заголовок: {article_rate["title"]}'
-
     def emit(self, record):
         if isinstance(record.msg, dict):
-            print(self.article_rate_to_msg(record.msg))
+            articles_rate = articles_rate_var.get()
+            articles_rate.append(record.msg)
+            print(f'Заголовок: {record.msg["title"]}')
         else:
             print(self.format(record))
 
