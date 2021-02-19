@@ -45,7 +45,7 @@ async def handle_index_page(request, max_articles_count):
 
 def main():
     load_dotenv()
-    logging.basicConfig(level=logging.DEBUG, handlers=[urls_handler.LogHandler()])
+    logging.basicConfig(level=logging.DEBUG)
     max_articles_count = int(os.getenv('MAX_ARTICLES_COUNT', default=10))
     app = web.Application()
     app.add_routes([

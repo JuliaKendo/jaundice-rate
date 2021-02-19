@@ -28,17 +28,6 @@ test_mode_var = contextvars.ContextVar('test_mode', default=False)
 test_timeout_var = contextvars.ContextVar('test_timeout', default=0)
 
 
-class LogHandler(logging.Handler):
-
-    def emit(self, record):
-        if isinstance(record.msg, dict):
-            articles_rate = articles_rate_var.get()
-            articles_rate.append(record.msg)
-            print(f'Заголовок: {record.msg["title"]}')
-        else:
-            print(self.format(record))
-
-
 class ProcessingStatus(Enum):
     OK = 'OK'
     FETCH_ERROR = 'FETCH_ERROR'
@@ -60,30 +49,34 @@ def run_timer():
 @contextmanager
 def handle_exceptions():
     test_mode = test_mode_var.get()
+    articles_rate = articles_rate_var.get()
     try:
-        yield
+        yield articles_rate
     except aiohttp.ClientResponseError:
-        logging.info({
+        articles_rate.append({
             'title': 'URL not exist',
             'status': str(ProcessingStatus.FETCH_ERROR),
             'rate': None, 'count_words': None
         })
+        logging.info('URL not exist')
         if test_mode:
             raise
     except adapters.ArticleNotFound as error:
-        logging.info({
+        articles_rate.append({
             'title': f'Статья на {error.message}',
             'status': str(ProcessingStatus.PARSING_ERROR),
             'rate': None, 'count_words': None
         })
+        logging.info(f'Статья на {error.message}')
         if test_mode:
             raise
     except asyncio.TimeoutError:
-        logging.info({
+        articles_rate.append({
             'title': 'Время ожидания ответа истекло',
             'status': str(ProcessingStatus.TIMEOUT),
             'rate': None, 'count_words': None
         })
+        logging.info('Время ожидания ответа истекло')
         if test_mode:
             raise
 
@@ -130,17 +123,18 @@ async def fetch(session, url):
 async def process_article(session, morph, charged_words, url):
     max_waiting_time = int(os.getenv('MAX_WAITING_TIME', default=3))
     with run_timer():
-        with handle_exceptions():
+        with handle_exceptions() as articles_rate:
             async with timeout(max_waiting_time):
                 html = await fetch(session, url)
                 sanitize_func = get_sanitize_func(url)
                 article_title, article_text = sanitize_func(html, True)
                 article_words = await text_tools.split_by_words(morph, article_text)
                 rate = text_tools.calculate_jaundice_rate(article_words, charged_words)
-                logging.info({
+                articles_rate.append({
                     'title': article_title, 'status': str(ProcessingStatus.OK),
                     'rate': rate, 'count_words': len(article_words)
                 })
+                logging.info(article_title)
 
 
 def prepare_clien_session(handle_function):
@@ -165,7 +159,7 @@ async def handle_sessions(urls, session, morph, charged_words, tasks):
 
 def test_download_of_articles():
     load_dotenv()
-    logging.basicConfig(level=logging.DEBUG, handlers=[LogHandler()])
+    logging.basicConfig(level=logging.DEBUG, )
     test_mode_var.set(True)
     with pytest.raises(aiohttp.ClientResponseError):
         asyncio.run(
@@ -177,7 +171,7 @@ def test_download_of_articles():
 
 def test_parsing_of_articles():
     load_dotenv()
-    logging.basicConfig(level=logging.DEBUG, handlers=[LogHandler()])
+    logging.basicConfig(level=logging.DEBUG)
     test_mode_var.set(True)
     with pytest.raises(adapters.ArticleNotFound):
         asyncio.run(
@@ -189,7 +183,7 @@ def test_parsing_of_articles():
 
 def test_timeouts():
     load_dotenv()
-    logging.basicConfig(level=logging.DEBUG, handlers=[LogHandler()])
+    logging.basicConfig(level=logging.DEBUG)
     test_mode_var.set(True)
     max_waiting_time = int(os.getenv('MAX_WAITING_TIME', default=3))
     test_timeout_var.set(max_waiting_time + 1)
